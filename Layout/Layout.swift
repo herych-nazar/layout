@@ -1,6 +1,6 @@
 //
 //  Layout.swift
-//  TestLayer
+//  Nervy
 //
 //  Created by Nazar on 3/25/19.
 //  Copyright © 2019 Nazar. All rights reserved.
@@ -30,7 +30,16 @@ protocol EdgeConstrainable {
     ///   - targetView: to which you want to attach
     ///   - edges: mutual edge point for view and targetView
     /// - Returns: array of created constraints(in appropriate order)
-    func constraint(to targetView: UIView, by edges: LayoutEdgePoint...) -> [NSLayoutConstraint]
+    func constraint(to target: AnchorConvertible, by edges: LayoutEdgePoint...) -> [NSLayoutConstraint]
+    
+    
+    /// Set all edges constraints to view into target
+    ///
+    /// - Parameters:
+    ///   - target: UIView or UILayoutGuide to which want to attach
+    ///   - offset: equal offset for all edges
+    /// - Returns: array of created constraints
+    func constraint(to target: AnchorConvertible, offset: CGFloat) -> [NSLayoutConstraint]
 }
 
 protocol LayoutAnchor {
@@ -84,8 +93,17 @@ class LayoutManager: LayoutSizeable, EdgeConstrainable {
     }
     
     @discardableResult
-    func constraint(to targetView: UIView, by edges: LayoutEdgePoint...) -> [NSLayoutConstraint] {
-        return edges.map { view.constraint(to: targetView, by: $0) }
+    func constraint(to target: AnchorConvertible, by edges: LayoutEdgePoint...) -> [NSLayoutConstraint] {
+        return edges.map { view.constraint(to: target, by: $0) }
+    }
+    
+    @discardableResult
+    func constraint(to target: AnchorConvertible, offset: CGFloat = 0) -> [NSLayoutConstraint] {
+        return [.top(offset),
+                .bottom(offset),
+                .leading(offset),
+                .trailing(offset)]
+            .map { view.constraint(to: target, by: $0) }
     }
 }
 
@@ -97,7 +115,20 @@ extension UIView {
             .activate()
     }
     
-    private func anchor(for layout: LayoutSize) -> NSLayoutDimension {
+    func anchor(for layout: LayoutSize) -> NSLayoutDimension {
+        switch layout {
+        case .height:
+            return heightAnchor
+        case .width:
+            return widthAnchor
+        }
+    }
+}
+
+
+// MARK: - Sizes anchor converter
+extension UILayoutGuide {
+    func anchor(for layout: LayoutSize) -> NSLayoutDimension {
         switch layout {
         case .height:
             return heightAnchor
@@ -109,7 +140,7 @@ extension UIView {
 
 // MARK: - Edge constraint
 extension UIView {
-    fileprivate func constraint(to view: UIView, by edge: LayoutEdgePoint) -> NSLayoutConstraint {
+    fileprivate func constraint(to view: AnchorConvertible, by edge: LayoutEdgePoint) -> NSLayoutConstraint {
         switch edge {
         case .top, .bottom:
             guard let point = edge.verticalPoint else {
@@ -129,7 +160,37 @@ extension UIView {
                 .activate()
         }
     }
+}
+
+// MARK: - Anchor list
+protocol Anchorable {
+    var leadingAnchor: NSLayoutXAxisAnchor { get }
+    var trailingAnchor: NSLayoutXAxisAnchor { get }
+    var topAnchor: NSLayoutYAxisAnchor { get }
+    var bottomAnchor: NSLayoutYAxisAnchor { get }
     
+    var widthAnchor: NSLayoutDimension { get }
+    var heightAnchor: NSLayoutDimension { get }
+    
+    var centerXAnchor: NSLayoutXAxisAnchor { get }
+    var centerYAnchor: NSLayoutYAxisAnchor { get }
+}
+
+extension UIView: Anchorable { }
+extension UILayoutGuide: Anchorable { }
+
+
+// MARK: - Anchor converter
+protocol AnchorConvertible {
+    func anchor(for horizontal: HorizontalPoint) -> NSLayoutAnchor<NSLayoutXAxisAnchor>
+    func anchor(for vertical: VerticalPoint) -> NSLayoutAnchor<NSLayoutYAxisAnchor>
+    func anchor(for layout: LayoutSize) -> NSLayoutDimension
+}
+
+extension UIView: AnchorConvertible { }
+extension UILayoutGuide: AnchorConvertible { }
+
+extension AnchorConvertible where Self: Anchorable {
     func anchor(for horizontal: HorizontalPoint) -> NSLayoutAnchor<NSLayoutXAxisAnchor> {
         switch horizontal {
         case .leading:
